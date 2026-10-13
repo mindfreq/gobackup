@@ -2,82 +2,49 @@ package backup
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
 	"log/slog"
 	"os"
-	// "path/filepath"
+	"path/filepath"
 
 	"github.com/mindfreq/gobackup/internal/backup/services"
 )
 
-const BAKINFOILE = "bakinfo.json"
-
-type FileInfo struct {
-	Mtime int64  `json:"mtime"`
-	Size  int64  `json:"size"`
-	Hash  string `json:"hash"`
-}
-
-type Bakinfo struct {
-	Folders map[string]string   `json:"folders"`
-	Files   map[string]FileInfo `json:"files"`
-}
-
-var bakinfoContent Bakinfo
-
-func init() {
-	backinfoFile, err := os.Open(BAKINFOILE)
+func IsChange(file *os.File) (bool, error) {
+	fileInfo, err := os.Stat(file.Name())
 	if err != nil {
-		switch {
-		// create backinfo if not exist
-		case errors.Is(err, os.ErrNotExist):
-			{
-				backinfoFile, err = os.Create(BAKINFOILE)
-				backinfoFile.WriteString(`{
-	"folders": {},
-	"files": {}
-}`)
-				if err != nil {
-					slog.Error("backup init", "error", err)
-				}
-				slog.Info("backup init", "bakinfo", "created")
+		return false, err
+	}
+
+	absPath, err := filepath.Abs(file.Name())
+	if err != nil {
+		return false, err
+	}
+
+	fileContent := bakinfoContent.Files[absPath]
+
+	// handle not exist
+	if fileContent.Size == 0 {
+		err = editBakfile(absPath)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	} else { // check chnaged if file exist
+		if fileContent.Mtime != fileInfo.ModTime().UnixNano() || fileContent.Size != fileInfo.Size() {
+			// file was changed
+			err = editBakfile(absPath)
+			if err != nil {
+				return true, err
 			}
+			return true, nil
+		} else {
+			// file not change
+			return false, nil
 		}
 	}
-	defer backinfoFile.Close()
-
-	backinfoFileByte, err := io.ReadAll(backinfoFile)
-	if err != nil {
-		slog.Error("backup init", "error", err)
-	}
-
-	err = json.Unmarshal(backinfoFileByte, &bakinfoContent)
-	if err != nil {
-		slog.Error("backup init", "error", err)
-	}
-
 }
 
-func IsChange(file *os.File) error {
-	// absPath, err := filepath.Abs(file.Name())
-	// if err != nil {
-	// 	return err
-	// }
-	fileInfo := bakinfoContent.Files["/hol2/22"]
-	// handle not exist
-	if fileInfo.Size == 0 {
-		
-	} else {
-		
-	}
-	fmt.Println(fileInfo)
-	return nil
-}
-
-func PreBackup(ctx context.Context, svc services.Service ,file *os.File) error {
+func PreBackup(ctx context.Context, svc services.Service, file *os.File) error {
 	info, err := file.Stat()
 	if err != nil {
 		return err
@@ -85,13 +52,27 @@ func PreBackup(ctx context.Context, svc services.Service ,file *os.File) error {
 
 	if info.IsDir() {
 		// todo
-	} else {
-		err = svc.Upload(ctx, "test", file)
+	} else { // if a file
+		isChange, err := IsChange(file)
 		if err != nil {
 			return err
 		}
-		slog.Info("successful upload", "file", file.Name())
+		abspath, err := filepath.Abs(file.Name())
+		if err != nil {
+			return err
+		}
+		if isChange {
+			key := "backup" + abspath
+			err = svc.Upload(ctx, key, file)
+			if err != nil {
+				return err
+			}
+			slog.Info("successful upload", "file", abspath)
+		} else {
+			// if file not change
+			slog.Info("file was not changed", "file", abspath)
+			return nil
+		}
 	}
-
 	return nil
 }

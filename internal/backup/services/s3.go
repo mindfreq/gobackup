@@ -1,10 +1,10 @@
 package services
 
 import (
-	"os"
-	"io"
 	"context"
 	"errors"
+	"io"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -14,21 +14,19 @@ import (
 	cfg "github.com/mindfreq/gobackup/internal/config"
 )
 
-
 type S3 struct {
-	client   *s3.Client
+	client *s3.Client
 	bucket string
 }
 
-
 func NewS3(ctx context.Context) (*S3, error) {
-	
+
 	ak := os.Getenv("AWS_ACCESS_KEY_ID")
 	sk := os.Getenv("AWS_SECRET_ACCESS_KEY")
 	if ak == "" || sk == "" {
 		return nil, errors.New("please set keys")
 	}
-	
+
 	awsCfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(cfg.Config.S3.Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(ak, sk, "")),

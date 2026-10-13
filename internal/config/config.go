@@ -1,9 +1,9 @@
 package config
 
 import (
-	"os"
 	"io"
 	"log/slog"
+	"os"
 
 	"github.com/BurntSushi/toml"
 )

@@ -35,14 +35,12 @@ func main() {
 						return nil
 					}
 					defer f.Close()
-					backup.IsChange(f)
 
-					err = backup.PreBackup(ctx, svc ,f)
+					err = backup.PreBackup(ctx, svc, f)
 					if err != nil {
 						slog.Error("main", "error", err)
 						return nil
 					}
-
 					return nil
 				},
 			},
