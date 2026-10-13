@@ -2,17 +2,22 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 
 	"github.com/mindfreq/gobackup/internal/backup"
-
+	"github.com/mindfreq/gobackup/internal/backup/services"
 	"github.com/urfave/cli/v3"
 )
 
 func main() {
-	fmt.Println(backup.BAKINFOILE)
+	ctx := context.Background()
+	svc, err := services.NewS3(ctx)
+	if err != nil {
+		slog.Error("s3 load", "error", err)
+		os.Exit(1)
+	}
+
 	cmd := &cli.Command{
 		Name:  "gobackup",
 		Usage: "Backup Tool",
@@ -24,7 +29,15 @@ func main() {
 				Usage:   "Add file or folder",
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					filePath := cmd.Args().First()
-					_, err := os.Open(filePath)
+					f, err := os.Open(filePath)
+					if err != nil {
+						slog.Error("main", "error", err)
+						return nil
+					}
+					defer f.Close()
+					backup.IsChange(f)
+
+					err = backup.PreBackup(ctx, svc ,f)
 					if err != nil {
 						slog.Error("main", "error", err)
 						return nil
