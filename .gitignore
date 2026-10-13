@@ -2,4 +2,4 @@ build
 
 bakinfo.json
 
-config.go
+config.toml
