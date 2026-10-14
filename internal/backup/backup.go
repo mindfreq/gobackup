@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-
+	
+	"golang.org/x/sync/errgroup"
+	
 	"github.com/mindfreq/gobackup/internal/backup/services"
 )
 
@@ -67,33 +69,32 @@ func handleFolder(ctx context.Context, svc services.Service, dir string) error {
 	if err != nil {
 		return err
 	}
-	var wg sync.WaitGroup
+	var g errgroup.Group
+	g.SetLimit(50)
 	for _, e := range entries {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		g.Go(func() error {
 			full := filepath.Join(dir, e.Name())
 			if e.IsDir() {
 				if err := handleFolder(ctx, svc, full); err != nil {
-					slog.Error("backup folder", "error", err)
-					return
+					return err
 				}
 			} else {
 				f, err := os.Open(full)
 				if err != nil {
-					slog.Error("backup folder", "error", err)
-					return
+					return err
 				}
 				err = handleFile(ctx, svc, f)
 				f.Close()
 				if err != nil {
-					slog.Error("backup folder", "error", err)
-					return
+					return err
 				}
 			}
-		}()
+			return nil
+		})
 	}
-	wg.Wait()
+	if err := g.Wait(); err != nil {
+		return err
+	}
 	return nil
 }
 
