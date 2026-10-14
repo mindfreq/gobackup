@@ -9,39 +9,49 @@ import (
 	"github.com/mindfreq/gobackup/internal/backup/services"
 )
 
-func IsChange(file *os.File) (bool, error) {
-	fileInfo, err := os.Stat(file.Name())
+func hasChange(path string, info os.FileInfo) (bool, error) {
+	old, ok := bakinfoContent.Files[path]
+	if !ok {
+		// file not found (chenge it to add)
+		return true, nil
+	}
+	
+	if old.Mtime == info.ModTime().UnixNano() && old.Size == info.Size() {
+		return false, nil
+	}
+	hash, err := GethashFile(path)
 	if err != nil {
 		return false, err
 	}
+	return hash != old.Hash, nil
+}
 
+func handleFile(ctx context.Context, svc services.Service, file *os.File) error {
+	info, err := os.Stat(file.Name())
+	if err != nil {
+		return err
+	}
 	absPath, err := filepath.Abs(file.Name())
 	if err != nil {
-		return false, err
+		return err
 	}
-
-	fileContent := bakinfoContent.Files[absPath]
-
-	// handle not exist
-	if fileContent.Size == 0 {
-		err = editBakfile(absPath)
-		if err != nil {
-			return false, err
-		}
-		return true, nil
-	} else { // check chnaged if file exist
-		if fileContent.Mtime != fileInfo.ModTime().UnixNano() || fileContent.Size != fileInfo.Size() {
-			// file was changed
-			err = editBakfile(absPath)
-			if err != nil {
-				return true, err
-			}
-			return true, nil
-		} else {
-			// file not change
-			return false, nil
-		}
+	chenged, err := hasChange(absPath, info)
+	if err != nil {
+		return err
 	}
+	if !chenged {
+		slog.Info("file has not changed", "file", absPath)
+		return nil
+	}
+	
+	if err := svc.Upload(ctx, "backup" + absPath, file); err != nil {
+		return err
+	}
+	if err := editBakfile(absPath); err != nil {
+		return err
+	}
+	slog.Info("successful upload", "file", absPath)
+	return nil
 }
 
 func PreBackup(ctx context.Context, svc services.Service, file *os.File) error {
@@ -52,27 +62,8 @@ func PreBackup(ctx context.Context, svc services.Service, file *os.File) error {
 
 	if info.IsDir() {
 		// todo
-	} else { // if a file
-		isChange, err := IsChange(file)
-		if err != nil {
-			return err
-		}
-		abspath, err := filepath.Abs(file.Name())
-		if err != nil {
-			return err
-		}
-		if isChange {
-			key := "backup" + abspath
-			err = svc.Upload(ctx, key, file)
-			if err != nil {
-				return err
-			}
-			slog.Info("successful upload", "file", abspath)
-		} else {
-			// if file not change
-			slog.Info("file was not changed", "file", abspath)
-			return nil
-		}
+	} else {
+		return handleFile(ctx, svc, file)
 	}
 	return nil
 }

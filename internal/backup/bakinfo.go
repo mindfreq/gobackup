@@ -12,7 +12,7 @@ import (
 
 const BAKINFOILE = "bakinfo.json"
 
-type FileInfo struct {
+type BakInfo struct {
 	Mtime int64  `json:"mtime"`
 	Size  int64  `json:"size"`
 	Hash  uint64 `json:"hash"`
@@ -20,7 +20,7 @@ type FileInfo struct {
 
 type Bakinfo struct {
 	Folders map[string]string   `json:"folders"`
-	Files   map[string]FileInfo `json:"files"`
+	Files   map[string]BakInfo `json:"files"`
 }
 
 var bakinfoContent Bakinfo
@@ -58,7 +58,7 @@ func init() {
 
 }
 
-func hashFile(path string) (uint64, error) {
+func GethashFile(path string) (uint64, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, err
@@ -86,12 +86,12 @@ func editBakfile(path string) error {
 		return err
 	}
 
-	hash, err := hashFile(path)
+	hash, err := GethashFile(path)
 	if err != nil {
 		return err
 	}
 
-	bakinfoContent.Files[path] = FileInfo{
+	bakinfoContent.Files[path] = BakInfo{
 		Mtime: info.ModTime().UnixNano(),
 		Size:  info.Size(),
 		Hash:  hash,
