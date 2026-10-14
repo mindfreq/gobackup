@@ -19,39 +19,33 @@ type BakInfo struct {
 }
 
 type Bakinfo struct {
-	Files   map[string]BakInfo `json:"files"`
+	Files map[string]BakInfo `json:"files"`
 }
 
 var bakinfoContent Bakinfo
 
 func init() {
-	bakFile, err := os.Open(BAKINFOILE)
-	if err != nil {
-		switch {
-		// create backinfo if not exist
-		case errors.Is(err, os.ErrNotExist):
-			{
-				bakFile, err = os.Create(BAKINFOILE)
-				bakFile.WriteString(`{"files": {}}`)
-				if err != nil {
-					slog.Error("backup init", "error", err)
-				}
-				slog.Info("backup init", "bakinfo", "created")
-			}
+	data, err := os.ReadFile(BAKINFOILE)
+	switch {
+	// create backinfo if not exist
+	case errors.Is(err, os.ErrNotExist):
+		data = []byte(`{"files": {}}`)
+		if err := os.WriteFile(BAKINFOILE, data, 0o644); err != nil {
+			slog.Error("backup init", "error", err)
+			return
 		}
-	}
-	defer bakFile.Close()
+		slog.Info("backup init", "bakinfo", "created")
 
-	bakFileByte, err := io.ReadAll(bakFile)
+	case err != nil:
+		slog.Error("backup init", "error", err)
+		return
+	}
+
+	err = json.Unmarshal(data, &bakinfoContent)
 	if err != nil {
 		slog.Error("backup init", "error", err)
+		os.Exit(1)
 	}
-
-	err = json.Unmarshal(bakFileByte, &bakinfoContent)
-	if err != nil {
-		slog.Error("backup init", "error", err)
-	}
-
 }
 
 func GethashFile(path string) (uint64, error) {

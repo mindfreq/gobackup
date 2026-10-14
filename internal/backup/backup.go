@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"os"
-	"sync"
 	"path/filepath"
+	"sync"
 
 	"github.com/mindfreq/gobackup/internal/backup/services"
 )
@@ -16,7 +16,7 @@ func hasChange(path string, info os.FileInfo) (bool, error) {
 		// file not found (chenge it to add)
 		return true, nil
 	}
-	
+
 	if old.Mtime == info.ModTime().UnixNano() && old.Size == info.Size() {
 		return false, nil
 	}
@@ -38,12 +38,12 @@ func handleFile(ctx context.Context, svc services.Service, file *os.File) error 
 	if err != nil {
 		return err
 	}
-	
+
 	// prevent race
 	bakMu.Lock()
 	chenged, err := hasChange(absPath, info)
 	bakMu.Unlock()
-	
+
 	if err != nil {
 		return err
 	}
@@ -51,8 +51,8 @@ func handleFile(ctx context.Context, svc services.Service, file *os.File) error 
 		slog.Info("file has not changed", "file", absPath)
 		return nil
 	}
-	
-	if err := svc.Upload(ctx, "backup" + absPath, file); err != nil {
+
+	if err := svc.Upload(ctx, "backup"+absPath, file); err != nil {
 		return err
 	}
 	if err := editBakfile(absPath); err != nil {
@@ -76,19 +76,19 @@ func handleFolder(ctx context.Context, svc services.Service, dir string) error {
 			if e.IsDir() {
 				if err := handleFolder(ctx, svc, full); err != nil {
 					slog.Error("backup folder", "error", err)
-					return 
+					return
 				}
 			} else {
 				f, err := os.Open(full)
 				if err != nil {
 					slog.Error("backup folder", "error", err)
-					return 
+					return
 				}
 				err = handleFile(ctx, svc, f)
 				f.Close()
 				if err != nil {
 					slog.Error("backup folder", "error", err)
-					return 
+					return
 				}
 			}
 		}()
@@ -103,7 +103,7 @@ func PreBackup(ctx context.Context, svc services.Service, file *os.File) error {
 		return err
 	}
 	if info.IsDir() {
-		path, err:= filepath.Abs(file.Name())
+		path, err := filepath.Abs(file.Name())
 		if err != nil {
 			return err
 		}
