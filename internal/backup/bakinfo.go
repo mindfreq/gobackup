@@ -19,24 +19,20 @@ type BakInfo struct {
 }
 
 type Bakinfo struct {
-	Folders map[string]string   `json:"folders"`
 	Files   map[string]BakInfo `json:"files"`
 }
 
 var bakinfoContent Bakinfo
 
 func init() {
-	backinfoFile, err := os.Open(BAKINFOILE)
+	bakFile, err := os.Open(BAKINFOILE)
 	if err != nil {
 		switch {
 		// create backinfo if not exist
 		case errors.Is(err, os.ErrNotExist):
 			{
-				backinfoFile, err = os.Create(BAKINFOILE)
-				backinfoFile.WriteString(`{
-	"folders": {},
-	"files": {}
-}`)
+				bakFile, err = os.Create(BAKINFOILE)
+				bakFile.WriteString(`{"files": {}}`)
 				if err != nil {
 					slog.Error("backup init", "error", err)
 				}
@@ -44,14 +40,14 @@ func init() {
 			}
 		}
 	}
-	defer backinfoFile.Close()
+	defer bakFile.Close()
 
-	backinfoFileByte, err := io.ReadAll(backinfoFile)
+	bakFileByte, err := io.ReadAll(bakFile)
 	if err != nil {
 		slog.Error("backup init", "error", err)
 	}
 
-	err = json.Unmarshal(backinfoFileByte, &bakinfoContent)
+	err = json.Unmarshal(bakFileByte, &bakinfoContent)
 	if err != nil {
 		slog.Error("backup init", "error", err)
 	}
@@ -81,6 +77,8 @@ func saveBakinfo() error {
 }
 
 func editBakfile(path string) error {
+	bakMu.Lock()
+	defer bakMu.Unlock()
 	info, err := os.Stat(path)
 	if err != nil {
 		return err
