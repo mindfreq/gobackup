@@ -6,11 +6,12 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/cespare/xxhash/v2"
 )
 
-const BAKINFOILE = "bakinfo.json"
+var BakInfoFile string
 
 type BakInfo struct {
 	Mtime int64  `json:"mtime"`
@@ -21,16 +22,22 @@ type BakInfo struct {
 type Bakinfo struct {
 	Files map[string]BakInfo `json:"files"`
 }
-
 var bakinfoContent Bakinfo
 
 func init() {
-	data, err := os.ReadFile(BAKINFOILE)
+	ConfigDir, err := os.UserConfigDir()
+	if err != nil {
+		homeDir, _ := os.UserHomeDir()
+		BakInfoFile = filepath.Join(homeDir, "gobackup", "bakinfo.json")
+	} else {
+		BakInfoFile = filepath.Join(ConfigDir, "gobackup", "bakinfo.json")	
+	}
+	data, err := os.ReadFile(BakInfoFile)
 	switch {
 	// create backinfo if not exist
 	case errors.Is(err, os.ErrNotExist):
 		data = []byte(`{"files": {}}`)
-		if err := os.WriteFile(BAKINFOILE, data, 0o644); err != nil {
+		if err := os.WriteFile(BakInfoFile, data, 0o644); err != nil {
 			slog.Error("backup init", "error", err)
 			return
 		}
@@ -67,7 +74,7 @@ func saveBakinfo() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(BAKINFOILE, data, 0o644)
+	return os.WriteFile(BakInfoFile, data, 0o644)
 }
 
 func editBakfile(path string) error {

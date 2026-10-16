@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	
+
 	"golang.org/x/sync/errgroup"
-	
+
 	"github.com/mindfreq/gobackup/internal/backup/services"
 )
 

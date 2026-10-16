@@ -1,9 +1,10 @@
 package config
 
 import (
-	"io"
+	"errors"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/BurntSushi/toml"
 )
@@ -20,19 +21,36 @@ type config struct {
 
 var Config config
 
+var DefaultConfigPath string
+
 func init() {
-	configFile, err := os.Open("config.toml")
+	ConfigDir, err := os.UserConfigDir()
 	if err != nil {
-		slog.Error("config init", "error", err)
-		os.Exit(1)
-	}
-	configFileByte, err := io.ReadAll(configFile)
-	if err != nil {
-		slog.Error("config init", "error", err)
-		os.Exit(1)
+		homeDir, _ := os.UserHomeDir()
+		DefaultConfigPath = filepath.Join(homeDir, "gobackup", "config.toml")
+	} else {
+		DefaultConfigPath = filepath.Join(ConfigDir, "gobackup", "config.toml")	
 	}
 
-	err = toml.Unmarshal(configFileByte, &Config)
+	data, err := os.ReadFile(DefaultConfigPath)
+	
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			slog.Error("config read", "error", err)
+			os.Exit(1)
+		}
+		if err := os.MkdirAll(filepath.Dir(DefaultConfigPath), 0o755); err != nil {
+	        slog.Error("config mkdir", "error", err)
+	        os.Exit(1)
+	    }
+	    data = []byte("[s3]\n")
+	    if err := os.WriteFile(DefaultConfigPath, data, 0o600); err != nil {
+	        slog.Error("config init", "error", err)
+	        os.Exit(1)
+	    }
+	}
+
+	err = toml.Unmarshal(data, &Config)
 	if err != nil {
 		slog.Error("config init", "error", err)
 		os.Exit(1)
